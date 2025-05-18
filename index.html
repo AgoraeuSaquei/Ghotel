@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cotação Mobile</title>
+  <style>
+    body { background-color: #1E1E1E; color: white; font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 20px; }
+    label { font-weight: bold; margin-top: 10px; display: block; }
+    input, select, pre, button { width: 100%; margin-top: 6px; margin-bottom: 12px; padding: 10px; box-sizing: border-box; background-color: #000; color: #fff; border: none; border-radius: 6px; font-size: 16px; }
+    input::placeholder { color: #888; }
+    button { background-color: #333; cursor: pointer; }
+    button:hover { background-color: #555; }
+    pre { background-color: #111; white-space: pre-wrap; min-height: 120px; }
+    .checkbox-container { display: flex; align-items: center; margin-top: 10px; }
+    .checkbox-container input { width: auto; margin-right: 8px; }
+  </style>
+</head>
+<body>
+  <h2>Cotação G Hotelaria (MOBILE)</h2>
+  <label for="checkin">Check‑In (DD/MM ou DDMM):</label>
+  <input type="text" id="checkin" placeholder="ex: 20/12" />
+  <label for="checkout">Check‑Out (DD/MM ou DDMM):</label>
+  <input type="text" id="checkout" placeholder="ex: 25/12" />
+  <label for="preco">Valor R$:</label>
+  <input type="number" id="preco" placeholder="ex: 1540" min="0" />
+  <label for="pousada">Pousada:</label>
+  <select id="pousada">
+    <option value="">Selecione</option>
+    <option>POUSADA CENTRO CLASS</option>
+    <option>POUSADA CASA CENTRO</option>
+    <option>POUSADA CENTRO UP</option>
+    <option>SOLAR JOÃO FERNANDES</option>
+  </select>
+  <label for="pessoas">Quantidade de Pessoas:</label>
+  <input type="number" id="pessoas" min="1" placeholder="1" />
+  <label for="quarto">Tipo de Quarto:</label>
+  <select id="quarto"><option value="">Opcional</option></select>
+  <label for="idioma">Idioma:</label>
+  <select id="idioma">
+    <option>Português</option>
+    <option>Español</option>
+    <option>English</option>
+    <option>Italiano</option>
+  </select>
+  <div class="checkbox-container">
+    <input type="checkbox" id="versaoCompleta" />
+    <label for="versaoCompleta" style="margin: 0; font-weight: normal;">Versão Completa</label>
+  </div>
+  <pre id="resultado" readonly></pre>
+  <button onclick="processar()">Gerar Cotação</button>
+  <button onclick="copiar()">Copiar Cotação</button>
+  <script>
+    const enderecos = {"POUSADA CENTRO CLASS":"R. Rui Barbosa, 08 - Centro, A. dos Búzios - RJ","POUSADA CASA CENTRO":"R. Rui Barbosa, 12 - Centro, A. dos Búzios - RJ","POUSADA CENTRO UP":"R. Rui Barbosa, 229 A - Centro, Triângulo A. dos Búzios - RJ","SOLAR JOÃO FERNANDES":"Rua São Cristovão, 16 - Bairro: João Fernandes, Búzios/RJ"};
+    const tipos_quarto = {"POUSADA":["Duplo Standard","Triplo"],"JOAO_FERNANDES":["Duplo","Triplo","Quadruplo","Quíntuplo","Sextuplo"]};
+    const labels = {'Português':['pt','noite','noites','pessoa','pessoas','❤️ Café da manhã incluído.'],'Español':['es','noche','noches','persona','personas','❤️ Desayuno incluido.'],'English':['en','night','nights','guest','guests','❤️ Breakfast included.'],'Italiano':['it','notte','notti','ospite','ospiti','❤️ Colazione inclusa.']};
+    const semana_map = {pt:{Dom:'Dom',Seg:'Seg',Ter:'Ter',Qua:'Qua',Qui:'Qui',Sex:'Sex',Sáb:'Sáb'},es:{Dom:'Dom',Seg:'Lun',Ter:'Mar',Qua:'Mié',Qui:'Jue',Sex:'Vie',Sáb:'Sáb'},en:{Dom:'Sun',Seg:'Mon',Ter:'Tue',Qua:'Wed',Qui:'Thu',Sex:'Fri',Sáb:'Sat'},it:{Dom:'Dom',Seg:'Lun',Ter:'Mar',Qua:'Mer',Qui:'Gio',Sex:'Ven',Sáb:'Sab'}};
+    const nome_map = {'POUSADA CENTRO CLASS':{pt:'POUSADA CENTRO CLASS',es:'POSADA CENTRO CLASS',en:'CENTRO CLASS INN',it:'LOCANDA CENTRO CLASS'},'POUSADA CASA CENTRO':{pt:'POUSADA CASA CENTRO',es:'POSADA CASA CENTRO',en:'CASA CENTRO INN',it:'LOCANDA CASA CENTRO'},'POUSADA CENTRO UP':{pt:'POUSADA CENTRO UP',es:'POSADA CENTRO UP',en:'CENTRO UP INN',it:'LOCANDA CENTRO UP'},'SOLAR JOÃO FERNANDES':{pt:'SOLAR JOÃO FERNANDES',es:'SOLAR JOÃO FERNANDES',en:'SOLAR JOÃO FERNANDES',it:'SOLAR JOÃO FERNANDES'}};
+    const qt_map = {'Duplo Standard':{pt:'Duplo Standard',es:'Doble Estándar',en:'Standard Double',it:'Doppia Standard'},'Triplo':{pt:'Triplo',es:'Triple',en:'Triple',it:'Tripla'},'Duplo':{pt:'Duplo',es:'Doble',en:'Double',it:'Doppia'},'Quadruplo':{pt:'Quadruplo',es:'Cuádruple',en:'Quadruple',it:'Quadrupla'},'Quíntuplo':{pt:'Quíntuplo',es:'Quíntuple',en:'Quintuple',it:'Quintupla'},'Sextuplo':{pt:'Sextuplo',es:'Séxtuple',en:'Sextuple',it:'Sestupla'}};
+    window.onload = atualizar_quartos;
+    document.getElementById('pousada').addEventListener('change', atualizar_quartos);
+    function atualizar_quartos() {
+      const pous = document.getElementById('pousada').value.toUpperCase();
+      const sel = document.getElementById('quarto');
+      sel.innerHTML = '<option value="">Opcional</option>';
+      const key = pous.includes('SOLAR') ? 'JOAO_FERNANDES' : 'POUSADA';
+      tipos_quarto[key].forEach(q => { const o = document.createElement('option'); o.textContent = q; sel.appendChild(o); });
+    }
+    function processar() {
+      const ciRaw = document.getElementById('checkin').value.trim();
+      const coRaw = document.getElementById('checkout').value.trim();
+      const pous = document.getElementById('pousada').value;
+      const pax = parseInt(document.getElementById('pessoas').value, 10);
+      const quarto = document.getElementById('quarto').value;
+      const idi = document.getElementById('idioma').value;
+      const completa = document.getElementById('versaoCompleta').checked;
+      const res = document.getElementById('resultado');
+      if (!ciRaw || !coRaw || !pous || !pax || !idi) { alert('Preencha todos os campos corretamente.'); return; }
+      const precoRaw = document.getElementById('preco').value.trim();
+      const precoNum = parseFloat(precoRaw.replace(',', '.'));
+      if (isNaN(precoNum) || precoNum <= 0) { alert('Informe um valor de preço válido.'); return; }
+      const precoFormatado = precoNum.toLocaleString('pt-BR',{ style: 'currency', currency: 'BRL' });
+      const parseDM = s => { const nums = s.replace(/\D/g,'').padStart(4,'0'); return { d: nums.slice(0,2), m: nums.slice(2,4) }; };
+      const ci = parseDM(ciRaw), co = parseDM(coRaw);
+      const dateIn = new Date(`2025-${ci.m}-${ci.d}T14:00`);
+      const dateOut = new Date(`2025-${co.m}-${co.d}T12:00`);
+      const diarias = Math.ceil((dateOut - dateIn)/(1000*60*60*24));
+      if (completa) {
+        // Versão completa multilíngue para todas pousadas
+        const [langCode, singNoite, pluNoite, singPax, pluPax] = labels[idi];
+        const nomeTrad = nome_map[pous][langCode];
+        const quartoTrad = quarto ? qt_map[quarto][langCode] : '';
+        const endereco = enderecos[pous];
+        const inStr = `${ci.d}/${ci.m}/25`;
+        const outStr = `${co.d}/${co.m}/25`;
+        const paxLabel = pax === 1 ? singPax : pluPax;
+        const titulo = pous.includes('SOLAR') ? '🏘️' : '🏨';
+        const precoLine = `💰 Valor ${precoFormatado}`;
+        const quartoLine = quartoTrad ? `${quartoTrad} 🛏️` : '';
+        const cafeMsgComp = pous.includes('SOLAR')
+          ? { pt: 'Sem café da manhã', es: 'Sin desayuno', en: 'No breakfast included', it: 'Senza colazione' }[langCode]
+          : labels[idi][5].replace('❤️ ', '').replace('.', '');
+        const naoReemb = {'pt':'Valor não reembolsável','es':'Valor no reembolsable','en':'Non-refundable','it':'Non rimborsabile'}[langCode];
+        const pagamento = {
+          'pt':'Para garantir a reserva solicitamos o pagamento de 50% via Pix, depósito, transferência, boleto ou cartão de crédito via link de reservas.',
+          'es':'Para garantizar la reserva solicitamos el pago del 50% via Pix, depósito, transferencia, boleto o tarjeta de crédito via link de reservas.',
+          'en':'To guarantee the reservation we request a 50% payment via Pix, deposit, transfer, boleto or credit card via reservation link.',
+          'it':'Per garantire la prenotazione richiediamo il pagamento del 50% tramite Pix, deposito, bonifico, bollettino o carta di credito tramite link di prenotazione.'
+        }[langCode];
+        const restante = {'pt':'50% restante a ser pago no check-in.','es':'50% restante a ser pagado al check-in.','en':'50% remaining to be paid at check-in.','it':'50% restante da pagare al check-in.'}[langCode];
+        res.textContent =
+`${titulo} ${nomeTrad} ${titulo}
+
+📍 ${endereco}
+
+* In: ${inStr}
+* Out: ${outStr}
+* Diárias: ${diarias}
+* ${paxLabel.charAt(0).toUpperCase() + paxLabel.slice(1)}: ${pax}
+* Check In: 14h
+* Check Out: ${pous.includes('SOLAR') ? '11h' : '12h'}
+
+${quartoLine}
+${cafeMsgComp}☕
+${precoLine}
+
+⚠️ ${naoReemb}
+
+✅ ${pagamento}
+✅ ${restante}
+
+🚨 Cotação válida por 24h
+
+Síganos nas redes sociais:
+📸 Instagram: ghotelariabrasil
+📱 Facebook: @ghotelariabrasil`;
+        return;
+      }
+      // Cotação básica para demais e Solar sem café
+      const [code,n1,nN,s1,sN,baseCafe] = labels[idi];
+      const cafeMsgBasic = pous.includes('SOLAR')
+        ? { pt: 'Sem café da manhã', es: 'Sin desayuno', en: 'No breakfast included', it: 'Senza colazione' }[code]
+        : baseCafe.replace('❤️ ', '').replace('.', '');
+      const dateInShort = new Date(`2025-${ci.m}-${ci.d}`);
+      const dateOutShort = new Date(`2025-${co.m}-${co.d}`);
+      const dsi = dateInShort.toLocaleDateString(code,{ weekday: 'short' });
+      const dso = dateOutShort.toLocaleDateString(code,{ weekday: 'short' });
+      const din = semana_map[code][dsi] || dsi;
+      const dout = semana_map[code][dso] || dso;
+      const tagP = nome_map[pous][code];
+      const quartoSelec = quarto ? qt_map[quarto][code] : '';
+      const dirL = { pt: 'Endereço', es: 'Dirección', en: 'Address', it: 'Indirizzo' }[code];
+      const dtL = { pt: 'Datas da Estadia', es: 'Fechas de la estancia', en: 'Stay Dates', it: 'Date del soggiorno' }[code];
+      const valL = { pt: 'Valor Total', es: 'Precio Total', en: 'Total Price', it: 'Valore Totale' }[code];
+      const hosp = pax === 1 ? s1 : sN;
+      let parts = [
+        `🏡 *${tagP}*`,
+        `📍 ${dirL}: ${enderecos[pous]}`
+      ];
+      if (quartoSelec) parts.push(`🛏️ ${quartoSelec}`);
+      parts.push(
+        `📅 ${dtL}`,
+        `➡️ Check-In: ${ci.d}/${ci.m}/2025 (${din}) 14:00`,
+        `➡️ Check-Out: ${co.d}/${co.m}/2025 (${dout}) 11:00`,
+        `➡️ ${diarias} ${diarias===1 ? n1 : nN}`,
+        `➡️ ${pax} ${hosp}`,
+        `💵 ${valL}: *${precoFormatado}*`,
+        `${cafeMsgBasic}`
+      );
+      res.textContent = parts.join('\n');
+    }
+    function copiar() {
+      const t = document.getElementById('resultado').textContent;
+      if (!t) return alert('Nada para copiar.');
+      navigator.clipboard.writeText(t).then(_=> alert('Cotação copiada!'));
+    }
+  </script>
+  <footer style="text-align:center;margin-top:40px;font-size:0.9em;color:#555;"><p>Christiano Marcos – Recepção</p></footer>
+</body>
+</html>
